@@ -1,0 +1,19 @@
+# --- 시스템 및 IDE 설정 ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Backend (Python) ---
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+
+# --- Frontend (Node.js/Next.js) ---
+frontend/node_modules/
+frontend/.next/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
