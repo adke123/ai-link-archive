@@ -2,9 +2,9 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-  "dev": "next dev --webpack",  
-  "build": "next build",
+ "scripts": {
+  "dev": "next dev --webpack",
+  "build": "next build --webpack",
   "start": "next start",
   "lint": "next lint"
 },
