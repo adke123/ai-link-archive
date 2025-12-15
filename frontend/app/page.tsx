@@ -6,6 +6,10 @@ import { supabase } from "../lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { Toaster, toast } from 'react-hot-toast';
 
+// 👇 여기에 배포된 주소들을 적어줍니다 (가장 중요!)
+const API_URL = "https://ai-link-archive.onrender.com"; // Render 백엔드 주소
+const SITE_URL = "https://ai-link-archive.vercel.app";  // Vercel 프론트 주소
+
 interface LinkItem {
   id: number;
   url: string;
@@ -34,7 +38,6 @@ export default function Home() {
   const [chatLoading, setChatLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
-  // 수정 모드
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState({ title: "", memo: "", category: "" });
   
@@ -54,21 +57,38 @@ export default function Home() {
   }, []);
 
   useEffect(() => { if (user) fetchLinks(); }, [user, viewMode]);
-  useEffect(() => { if (darkMode) document.documentElement.classList.add("dark"); else document.documentElement.classList.remove("dark"); }, [darkMode]);
+  useEffect(() => { 
+    if (darkMode) document.documentElement.classList.add("dark"); 
+    else document.documentElement.classList.remove("dark"); 
+  }, [darkMode]);
 
-  const handleLogin = async () => await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+  // 👇 로그인 함수 수정 (리다이렉트 주소 명시)
+  const handleLogin = async () => {
+    await supabase.auth.signInWithOAuth({ 
+      provider: 'google', 
+      options: { redirectTo: SITE_URL } 
+    });
+  };
+
   const handleLogout = async () => { await supabase.auth.signOut(); toast.success("로그아웃되었습니다."); };
 
   const fetchLinks = async () => {
     try {
+      let res;
       if (viewMode === 'my' && user) {
-        const res = await axios.get(`https://ai-link-archive.onrender.com/?user_id=${user.id}`);
-        setLinks(res.data.links);
+        // 👇 API_URL 사용
+        res = await axios.get(`${API_URL}/links?user_id=${user.id}`);
+        // 안전장치 추가: 데이터가 없으면 빈 배열 []
+        setLinks(res.data.links || []);
       } else {
-        const res = await axios.get(`https://ai-link-archive.onrender.com/explore`);
-        setLinks(res.data);
+        // 👇 API_URL 사용
+        res = await axios.get(`${API_URL}/explore`);
+        setLinks(res.data || []);
       }
-    } catch {}
+    } catch (e) {
+      console.error("데이터 불러오기 실패:", e);
+      setLinks([]); // 에러나면 빈 화면 보여주기 (앱 죽는 것 방지)
+    }
   };
 
   const handleSubmit = async () => {
@@ -77,13 +97,14 @@ export default function Home() {
     const loadingToast = toast.loading("AI가 분석 중입니다...");
 
     try { 
-      await axios.post("https://ai-link-archive.onrender.com/links", { url: inputUrl, user_id: user.id }); 
+      // 👇 API_URL 사용
+      await axios.post(`${API_URL}/links`, { url: inputUrl, user_id: user.id }); 
       setInputUrl(""); 
       fetchLinks(); 
-      toast.success("링크가 저장되었습니다!", { id: loadingToast });
+      toast.success("저장 성공!", { id: loadingToast });
     } 
     catch { 
-      toast.error("저장에 실패했습니다.", { id: loadingToast });
+      toast.error("저장 실패", { id: loadingToast });
     } finally { setLoading(false); }
   };
 
@@ -94,29 +115,29 @@ export default function Home() {
     formData.append("user_id", user.id);
     
     setLoading(true);
-    const loadingToast = toast.loading("파일을 읽고 분석 중...");
+    const loadingToast = toast.loading("파일 분석 중...");
 
     try { 
-      await axios.post("https://ai-link-archive.onrender.com/upload", formData); 
+      // 👇 API_URL 사용
+      await axios.post(`${API_URL}/upload`, formData); 
       fetchLinks(); 
-      toast.success("파일 업로드 성공!", { id: loadingToast });
+      toast.success("업로드 성공!", { id: loadingToast });
     } catch {
-      toast.error("파일 업로드 실패", { id: loadingToast });
+      toast.error("업로드 실패", { id: loadingToast });
     }
     finally { setLoading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 
-  // 수정 시작
   const startEdit = (link: LinkItem) => {
     setEditingId(link.id);
     setEditData({ title: link.title, memo: link.memo, category: link.category });
   };
 
-  // 수정 저장
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      await axios.put(`https://ai-link-archive.onrender.com/links/${editingId}`, editData);
+      // 👇 API_URL 사용
+      await axios.put(`${API_URL}/links/${editingId}`, editData);
       setEditingId(null);
       fetchLinks();
       toast.success("수정되었습니다.");
@@ -126,7 +147,11 @@ export default function Home() {
   const openChat = async (id: number) => {
     if (chatLinkId === id) { setChatLinkId(null); return; }
     setChatLinkId(id); setChatHistory([]);
-    try { const res = await axios.get(`https://ai-link-archive.onrender.com/links/${id}/chat`); setChatHistory(res.data); } catch {}
+    try { 
+      // 👇 API_URL 사용
+      const res = await axios.get(`${API_URL}/links/${id}/chat`); 
+      setChatHistory(res.data); 
+    } catch {}
   };
 
   const handleChat = async (e: React.FormEvent) => {
@@ -135,7 +160,8 @@ export default function Home() {
     const tempMsg = { sender: 'user', message: chatQuestion };
     setChatHistory(prev => [...prev, tempMsg]); setChatQuestion(""); setChatLoading(true);
     try {
-      const res = await axios.post(`https://ai-link-archive.onrender.com/links/${chatLinkId}/chat`, { question: tempMsg.message });
+      // 👇 API_URL 사용
+      const res = await axios.post(`${API_URL}/links/${chatLinkId}/chat`, { question: tempMsg.message });
       setChatHistory(prev => [...prev, { sender: 'ai', message: res.data.answer }]);
     } catch { setChatHistory(prev => [...prev, { sender: 'ai', message: "오류 발생" }]); } 
     finally { setChatLoading(false); }
@@ -143,7 +169,8 @@ export default function Home() {
 
   const handleDelete = async (id: number) => { 
     if (confirm("정말 삭제하시겠습니까?")) { 
-      await axios.delete(`https://ai-link-archive.onrender.com/links/${id}`); 
+      // 👇 API_URL 사용
+      await axios.delete(`${API_URL}/links/${id}`); 
       toast.success("삭제되었습니다."); 
       fetchLinks(); 
     } 
@@ -180,11 +207,11 @@ export default function Home() {
         )}
 
         <div className="space-y-4">
-          {links.map((link) => (
+          {/* 👇 안전장치: links가 없으면 빈 배열 처리 */}
+          {(links || []).map((link) => (
             <div key={link.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow border dark:border-slate-700 hover:shadow-md transition">
               
               {editingId === link.id ? (
-                // --- 수정 모드 ---
                 <div className="space-y-3">
                   <input className="w-full p-2 border rounded dark:bg-slate-700" value={editData.title} onChange={(e) => setEditData({...editData, title: e.target.value})} placeholder="제목" />
                   <textarea className="w-full p-2 border rounded h-20 dark:bg-slate-700" value={editData.memo} onChange={(e) => setEditData({...editData, memo: e.target.value})} placeholder="메모 입력..." />
@@ -194,14 +221,12 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                // --- 일반 보기 모드 ---
                 <>
                   <div className="flex justify-between mb-3 items-start">
                      <div className="flex-1">
                         <span className="text-xs font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded mr-2">{link.category}</span>
                         <a href={link.url} target="_blank" className="font-bold text-xl hover:text-indigo-500 transition break-all">{link.title || "제목 없음"}</a>
                      </div>
-                     {/* 내 글일 때만 수정/삭제 버튼 */}
                      {viewMode === 'my' && (
                        <div className="flex gap-2 ml-2">
                          <button onClick={() => startEdit(link)} className="text-gray-400 hover:text-indigo-500">✏️</button>
@@ -214,7 +239,6 @@ export default function Home() {
                     <span className="font-bold text-indigo-500 mr-2">AI 요약</span>{link.summary}
                   </div>
 
-                  {/* 📝 사라졌던 메모 섹션 부활! */}
                   {link.memo && (
                     <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-gray-700 dark:text-gray-300 rounded-lg text-sm border border-yellow-100 dark:border-yellow-800 flex items-start gap-2">
                       <span className="mt-0.5">📝</span>
