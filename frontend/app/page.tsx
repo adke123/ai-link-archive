@@ -62,10 +62,10 @@ export default function Home() {
   const fetchLinks = async () => {
     try {
       if (viewMode === 'my' && user) {
-        const res = await axios.get(`http://127.0.0.1:8000/links?user_id=${user.id}`);
+        const res = await axios.get(`https://ai-link-archive.onrender.com/?user_id=${user.id}`);
         setLinks(res.data.links);
       } else {
-        const res = await axios.get(`http://127.0.0.1:8000/explore`);
+        const res = await axios.get(`https://ai-link-archive.onrender.com/explore`);
         setLinks(res.data);
       }
     } catch {}
@@ -77,7 +77,7 @@ export default function Home() {
     const loadingToast = toast.loading("AI가 분석 중입니다...");
 
     try { 
-      await axios.post("http://127.0.0.1:8000/links", { url: inputUrl, user_id: user.id }); 
+      await axios.post("https://ai-link-archive.onrender.com/links", { url: inputUrl, user_id: user.id }); 
       setInputUrl(""); 
       fetchLinks(); 
       toast.success("링크가 저장되었습니다!", { id: loadingToast });
@@ -97,7 +97,7 @@ export default function Home() {
     const loadingToast = toast.loading("파일을 읽고 분석 중...");
 
     try { 
-      await axios.post("http://127.0.0.1:8000/upload", formData); 
+      await axios.post("https://ai-link-archive.onrender.com/upload", formData); 
       fetchLinks(); 
       toast.success("파일 업로드 성공!", { id: loadingToast });
     } catch {
@@ -116,7 +116,7 @@ export default function Home() {
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      await axios.put(`http://127.0.0.1:8000/links/${editingId}`, editData);
+      await axios.put(`https://ai-link-archive.onrender.com/links/${editingId}`, editData);
       setEditingId(null);
       fetchLinks();
       toast.success("수정되었습니다.");
@@ -126,7 +126,7 @@ export default function Home() {
   const openChat = async (id: number) => {
     if (chatLinkId === id) { setChatLinkId(null); return; }
     setChatLinkId(id); setChatHistory([]);
-    try { const res = await axios.get(`http://127.0.0.1:8000/links/${id}/chat`); setChatHistory(res.data); } catch {}
+    try { const res = await axios.get(`https://ai-link-archive.onrender.com/links/${id}/chat`); setChatHistory(res.data); } catch {}
   };
 
   const handleChat = async (e: React.FormEvent) => {
@@ -135,7 +135,7 @@ export default function Home() {
     const tempMsg = { sender: 'user', message: chatQuestion };
     setChatHistory(prev => [...prev, tempMsg]); setChatQuestion(""); setChatLoading(true);
     try {
-      const res = await axios.post(`http://127.0.0.1:8000/links/${chatLinkId}/chat`, { question: tempMsg.message });
+      const res = await axios.post(`https://ai-link-archive.onrender.com/links/${chatLinkId}/chat`, { question: tempMsg.message });
       setChatHistory(prev => [...prev, { sender: 'ai', message: res.data.answer }]);
     } catch { setChatHistory(prev => [...prev, { sender: 'ai', message: "오류 발생" }]); } 
     finally { setChatLoading(false); }
@@ -143,7 +143,7 @@ export default function Home() {
 
   const handleDelete = async (id: number) => { 
     if (confirm("정말 삭제하시겠습니까?")) { 
-      await axios.delete(`http://127.0.0.1:8000/links/${id}`); 
+      await axios.delete(`https://ai-link-archive.onrender.com/links/${id}`); 
       toast.success("삭제되었습니다."); 
       fetchLinks(); 
     } 
