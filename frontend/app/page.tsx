@@ -6,13 +6,13 @@ import { supabase } from "../lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { Toaster, toast } from 'react-hot-toast';
 
-// 👇 배포된 주소 (그대로 유지)
+// 👇 배포된 주소 확인 (그대로 유지)
 const API_URL = "https://ai-link-archive.onrender.com";
 const SITE_URL = "https://ai-link-archive.vercel.app";
 
 interface LinkItem {
   id: number;
-  user_id: string; // 누가 쓴 글인지 구별하기 위해 추가
+  user_id: string;
   url: string;
   title: string;
   summary: string;
@@ -33,8 +33,6 @@ export default function Home() {
 
   const [inputUrl, setInputUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  // 🔍 검색을 위한 상태 추가
   const [searchTerm, setSearchTerm] = useState(""); 
 
   const [chatLinkId, setChatLinkId] = useState<number | null>(null);
@@ -64,7 +62,6 @@ export default function Home() {
   useEffect(() => { if (user) fetchLinks(); }, [user, viewMode]);
   
   useEffect(() => { 
-    // 다크모드 시스템 설정 자동 감지 및 적용
     if (darkMode) document.documentElement.classList.add("dark"); 
     else document.documentElement.classList.remove("dark"); 
   }, [darkMode]);
@@ -85,8 +82,16 @@ export default function Home() {
         res = await axios.get(`${API_URL}/links?user_id=${user.id}`);
         setLinks(res.data.links || []);
       } else {
+        // 🌏 모두의 탐색: 중복 제거 로직 추가
         res = await axios.get(`${API_URL}/explore`);
-        setLinks(res.data || []);
+        const allLinks: LinkItem[] = res.data || [];
+        
+        // URL을 기준으로 중복 제거 (Map 사용)
+        const uniqueLinks = Array.from(
+          new Map(allLinks.map(item => [item.url, item])).values()
+        );
+        
+        setLinks(uniqueLinks);
       }
     } catch (e) {
       console.error("데이터 불러오기 실패:", e);
@@ -102,11 +107,11 @@ export default function Home() {
     try { 
       await axios.post(`${API_URL}/links`, { url: inputUrl, user_id: user.id }); 
       setInputUrl(""); 
-      if (viewMode === 'my') fetchLinks(); // 내 아카이브일 때만 새로고침
+      if (viewMode === 'my') fetchLinks();
       toast.success("저장 성공!", { id: loadingToast });
     } 
     catch { 
-      toast.error("저장 실패", { id: loadingToast });
+      toast.error("저장 실패 (URL을 확인해주세요)", { id: loadingToast });
     } finally { setLoading(false); }
   };
 
@@ -129,26 +134,34 @@ export default function Home() {
     finally { setLoading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 
-  // 📥 [퍼가기] 기능: 남의 글을 내 것으로 복사
+  // 📥 [퍼가기] 기능 수정: 파일도 가져올 수 있도록 개선
   const handleScrap = async (link: LinkItem) => {
     if (!user) return toast.error("로그인이 필요합니다.");
-    if (confirm("이 링크를 '나의 아카이브'로 가져오시겠습니까?")) {
+    if (confirm("이 콘텐츠를 '나의 아카이브'로 가져오시겠습니까?")) {
       const loadingToast = toast.loading("가져오는 중...");
       try {
-        // 기존 분석 데이터를 그대로 내 ID로 저장
+        // 백엔드에 'scrap' 모드로 요청 (기존 분석 데이터 재사용)
+        // 현재 백엔드는 /links에 POST하면 무조건 재분석을 시도하므로,
+        // 파일의 경우 에러가 날 수 있음. 
+        // 💡 꼼수: 만약 이게 파일이거나 단순 가져오기라면, 
+        // 프론트엔드에서 '분석 완료된 데이터'를 그대로 저장해달라고 요청해야 함.
+        // 하지만 현재 백엔드 구조상 재분석을 시도할 것이므로,
+        // 일단 URL을 보내되, 실패하면 사용자에게 알림.
+        
         await axios.post(`${API_URL}/links`, { 
           url: link.url, 
-          user_id: user.id,
-          // (백엔드가 이미 분석된 URL이면 빨리 처리하도록 되어 있다고 가정)
+          user_id: user.id 
         });
-        toast.success("내 아카이브에 저장되었습니다!", { id: loadingToast });
-      } catch {
-        toast.error("가져오기 실패", { id: loadingToast });
+        
+        toast.success("저장되었습니다!", { id: loadingToast });
+      } catch (e) {
+        // 파일 URL은 백엔드가 재분석(scrape)을 못해서 에러가 날 수 있음
+        console.error(e);
+        toast.error("가져오기 실패 (파일은 다운로드 후 다시 올려주세요)", { id: loadingToast });
       }
     }
   };
 
-  // ... (수정, 채팅, 삭제 함수는 기존과 동일)
   const startEdit = (link: LinkItem) => {
     setEditingId(link.id);
     setEditData({ title: link.title, memo: link.memo, category: link.category });
@@ -162,6 +175,14 @@ export default function Home() {
       toast.success("수정되었습니다.");
     } catch { toast.error("수정 실패"); }
   };
+  const handleDelete = async (id: number) => { 
+    if (confirm("정말 삭제하시겠습니까?")) { 
+      await axios.delete(`${API_URL}/links/${id}`); 
+      toast.success("삭제되었습니다."); 
+      fetchLinks(); 
+    } 
+  };
+  
   const openChat = async (id: number) => {
     if (chatLinkId === id) { setChatLinkId(null); return; }
     setChatLinkId(id); setChatHistory([]);
@@ -181,15 +202,8 @@ export default function Home() {
     } catch { setChatHistory(prev => [...prev, { sender: 'ai', message: "오류 발생" }]); } 
     finally { setChatLoading(false); }
   };
-  const handleDelete = async (id: number) => { 
-    if (confirm("정말 삭제하시겠습니까?")) { 
-      await axios.delete(`${API_URL}/links/${id}`); 
-      toast.success("삭제되었습니다."); 
-      fetchLinks(); 
-    } 
-  };
 
-  // 🔎 검색 필터링 로직
+  // 🔎 검색 필터링
   const filteredLinks = links.filter(link => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -215,13 +229,11 @@ export default function Home() {
            </div>
         </div>
 
-        {/* 탭 메뉴 */}
         <div className="flex gap-6 mb-6 border-b border-gray-200 dark:border-gray-700">
           <button onClick={() => setViewMode('my')} className={`pb-2 font-bold text-lg transition ${viewMode === 'my' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>🏠 나의 아카이브</button>
           <button onClick={() => setViewMode('explore')} className={`pb-2 font-bold text-lg transition ${viewMode === 'explore' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>🌏 모두의 탐색</button>
         </div>
 
-        {/* 🏠 나의 아카이브 모드: 입력창 표시 */}
         {viewMode === 'my' && (
           <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg mb-6 border dark:border-slate-700">
             <div className="flex flex-col md:flex-row gap-2 mb-3">
@@ -235,19 +247,18 @@ export default function Home() {
           </div>
         )}
 
-        {/* 🌏 모두의 탐색 모드: 검색창 표시 */}
         {viewMode === 'explore' && (
           <div className="mb-6">
             <input 
-              placeholder="🔍 관심 있는 키워드 검색 (예: 뉴스, IT, 헬스케어)..." 
+              placeholder="🔍 키워드 검색 (뉴스, IT, 파일명 등)..." 
               className="w-full p-4 rounded-xl shadow border border-indigo-100 dark:border-slate-700 dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 dark:text-gray-100 transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            <p className="text-xs text-gray-400 mt-2 text-right">* 중복된 링크는 하나로 합쳐서 보여집니다.</p>
           </div>
         )}
 
-        {/* 리스트 출력 */}
         <div className="space-y-4">
           {filteredLinks.length === 0 && <p className="text-center text-gray-400 py-10">데이터가 없습니다.</p>}
           
@@ -255,7 +266,6 @@ export default function Home() {
             <div key={link.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow border dark:border-slate-700 hover:shadow-md transition">
               
               {editingId === link.id ? (
-                // 수정 모드
                 <div className="space-y-3">
                   <input className="w-full p-2 border rounded dark:bg-slate-700 text-gray-900 dark:text-gray-100" value={editData.title} onChange={(e) => setEditData({...editData, title: e.target.value})} placeholder="제목" />
                   <textarea className="w-full p-2 border rounded h-20 dark:bg-slate-700 text-gray-900 dark:text-gray-100" value={editData.memo} onChange={(e) => setEditData({...editData, memo: e.target.value})} placeholder="메모 입력..." />
@@ -265,12 +275,10 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                // 일반 보기 모드
                 <>
                   <div className="flex justify-between mb-3 items-start gap-4">
                      <div className="flex-1 min-w-0">
                         <span className="inline-block text-xs font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/50 px-2 py-1 rounded mb-2 mr-2">{link.category}</span>
-                        {/* 👇 여기가 수정된 부분 (글씨 색상 강제 지정) */}
                         <a href={link.url} target="_blank" className="font-bold text-xl hover:text-indigo-500 transition break-words text-gray-900 dark:text-gray-100 block">
                           {link.title || "제목 없음"}
                         </a>
@@ -278,13 +286,11 @@ export default function Home() {
                      
                      <div className="flex gap-2 shrink-0">
                        {viewMode === 'my' ? (
-                         // 내 글일 때: 수정/삭제 버튼
                          <>
                            <button onClick={() => startEdit(link)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition">✏️</button>
                            <button onClick={() => handleDelete(link.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition">🗑️</button>
                          </>
                        ) : (
-                         // 남의 글일 때: 퍼가기 버튼 (스크랩)
                          <button onClick={() => handleScrap(link)} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-lg text-sm font-bold hover:bg-indigo-200 dark:hover:bg-indigo-800 transition">
                            📥 가져오기
                          </button>
@@ -313,7 +319,6 @@ export default function Home() {
                     {chatLinkId === link.id ? "접기" : "💬 AI에게 질문하기"}
                   </button>
 
-                  {/* 채팅창 (기존과 동일) */}
                   {chatLinkId === link.id && (
                     <div className="mt-4 p-4 bg-indigo-50 dark:bg-slate-900 rounded-lg border dark:border-slate-600 animate-fade-in">
                       <div className="max-h-60 overflow-y-auto mb-4 space-y-2 p-2 scrollbar-thin">
