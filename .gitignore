@@ -1,19 +1,41 @@
-# --- 시스템 및 IDE 설정 ---
+# =========================
+# 🚫 공통 (보안 및 OS 파일) - 절대 올리지 마세요!
+# =========================
+.env
+.env.*
 .DS_Store
 .vscode/
 .idea/
 
-# --- Backend (Python) ---
+# =========================
+# 🐍 백엔드 (Python/FastAPI)
+# =========================
+# 가상환경 폴더 (이거 올라가면 안 됨!)
 backend/venv/
-backend/__pycache__/
-backend/*.pyc
-backend/.env
+venv/
+env/
 
-# --- Frontend (Node.js/Next.js) ---
+# 파이썬 캐시 및 빌드 파일
+__pycache__/
+*.py[cod]
+*.so
+
+# =========================
+# ⚛️ 프론트엔드 (Next.js/Node)
+# =========================
+# 라이브러리 설치 폴더 (용량 엄청 큼)
 frontend/node_modules/
+node_modules/
+
+# Next.js 빌드 결과물
 frontend/.next/
-frontend/.env
-frontend/.env.local
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
+.next/
+frontend/out/
+out/
+frontend/build/
+build/
+
+# 로그 파일
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
