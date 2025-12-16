@@ -9,7 +9,6 @@
 ## 🚀 배포 주소 (Live Demo)
 - **Frontend (Vercel):** https://ai-link-archive.vercel.app
 - **Backend (Render):** https://ai-link-archive.onrender.com
-- **Test ID:** (면접관이 바로 테스트할 수 있게 테스트용 계정을 적어두면 좋습니다. 예: test@google.com / 1234)
 
 ---
 
